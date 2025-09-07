@@ -7,13 +7,13 @@ export interface CertificationDocument {
   patientName: string; // Added to match backend response
   therapistId: string;
   therapistName: string; // Added to match backend response
-  month: string; // Changed from number to string to match backend
+  month: number; // Changed to integer to match backend
   year: number;
-  therapyType: string; // Added to match backend response
+  therapyType: number; // Changed to integer to match backend
   sessionCount: number; // Added to match backend response
   totalSessions: number;
   completedSessions: number;
-  status: CertificationStatus;
+  status: number; // Changed to integer to match backend
   submittedAt?: string;
   approvedAt?: string;
   rejectedAt?: string;
@@ -106,19 +106,21 @@ export interface TherapySession {
 }
 
 export enum CertificationStatus {
-  DRAFT = 'draft',
-  SUBMITTED = 'submitted',
-  UNDER_REVIEW = 'under_review',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  REVISION_REQUIRED = 'revision_required'
+  DRAFT = 1,
+  SUBMITTED = 2,
+  UNDER_REVIEW = 3,
+  APPROVED = 3,
+  REJECTED = 4,
+  REVISION_REQUIRED = 2
 }
 
 export enum ParentSignatureStatus {
-  PENDING = 'pending',
-  SIGNED = 'signed',
-  NOT_REQUIRED = 'not_required',
-  REFUSED = 'refused'
+  PENDING = 1,
+  SIGNED = 2,
+  COMPLETED = 2,
+  APPROVED = 3,
+  NOT_REQUIRED = 0,
+  REFUSED = 0
 }
 
 export interface CertificationFormData {
@@ -131,10 +133,10 @@ export interface CertificationFormData {
 
 export interface CreateCertificationRequest {
   patientId: string;
-  month: string; // Backend expects month name
+  month: number; // Backend expects month number
   year: number;
-  therapyType: string;
-  status?: CertificationStatus;
+  therapyType: number;
+  status?: number;
   duration?: number;
   frequencyPerWeek?: number;
   location?: string;
@@ -151,7 +153,7 @@ export interface CreateCertificationRequest {
 
 export interface UpdateCertificationRequest extends Partial<CertificationFormData> {
   id: string;
-  status?: CertificationStatus;
+  status?: number;
   rejectionReason?: string;
 }
 
@@ -160,7 +162,7 @@ export interface CertificationsFilter {
   therapistId?: string;
   month?: number;
   year?: number;
-  status?: CertificationStatus;
+  status?: number;
   search?: string;
   startDate?: string;
   endDate?: string;

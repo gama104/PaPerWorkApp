@@ -174,7 +174,7 @@ export default function CertificationEditForm({
 
       // Map to backend DTO format (PascalCase as per UpdateCertificationRequest)
       const updateData: Record<string, unknown> = {
-        Month: monthLabel,
+        Month: currentFormData.month, // Send integer, not string
         Year: currentFormData.year,
         TherapyType: currentFormData.therapyType,
         Status: currentFormData.status,

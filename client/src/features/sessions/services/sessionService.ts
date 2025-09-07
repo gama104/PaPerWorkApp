@@ -1,5 +1,6 @@
 // Session Service - API Communication Layer
 import { tokenService } from '@/features/auth/services/tokenService';
+import { authService } from '@/features/auth/services/authService';
 import type {
   TherapySession,
   CreateSessionRequest,
@@ -31,7 +32,7 @@ class SessionService {
       if (filter.therapistId) queryParams.append('therapistId', filter.therapistId);
       if (filter.patientName) queryParams.append('patientName', filter.patientName);
       if (filter.location) queryParams.append('location', filter.location);
-      if (filter.signatureStatus) queryParams.append('signatureStatus', filter.signatureStatus);
+      if (filter.signatureStatus) queryParams.append('signatureStatus', filter.signatureStatus.toString());
       if (filter.search) queryParams.append('search', filter.search);
       if (filter.page) queryParams.append('page', filter.page.toString());
       if (filter.pageSize) queryParams.append('pageSize', filter.pageSize.toString());
@@ -40,34 +41,21 @@ class SessionService {
 
       const url = queryParams.toString() ? `${this.baseURL}?${queryParams}` : this.baseURL;
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      const data = await authService.authenticatedRequest(url);
+      
+      console.log('SessionService: Raw response data:', data);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          tokenService.logout();
-          throw new Error('Session expired');
-        }
-        throw new Error(data.message || 'Failed to fetch sessions');
-      }
-
-      if (data.status === 200 && data.data) {
+      // The authenticatedRequest returns the unwrapped data, so we need to check for the actual data structure
+      if (data && (data.items || data.sessions || Array.isArray(data))) {
+        const sessions = data.items || data.sessions || data;
         return {
-          sessions: data.data,
-          totalCount: data.pagination?.totalItems || data.data.length,
-          page: data.pagination?.page || 1,
-          pageSize: data.pagination?.pageSize || data.data.length,
-          totalPages: data.pagination?.totalPages || 1,
-          hasNext: data.pagination?.hasNext || false,
-          hasPrevious: data.pagination?.hasPrevious || false,
+          sessions: sessions,
+          totalCount: data.totalCount || data.pagination?.totalItems || sessions.length,
+          page: data.page || data.pagination?.page || 1,
+          pageSize: data.pageSize || data.pagination?.pageSize || sessions.length,
+          totalPages: data.totalPages || data.pagination?.totalPages || 1,
+          hasNext: data.hasNext || data.pagination?.hasNext || false,
+          hasPrevious: data.hasPrevious || data.pagination?.hasPrevious || false,
         };
       }
 

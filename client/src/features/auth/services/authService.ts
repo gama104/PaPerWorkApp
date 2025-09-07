@@ -1,5 +1,6 @@
 // Enhanced Auth Service with Security Best Practices
 import { tokenService } from './tokenService';
+import { apiClient } from '@/services/apiClient';
 import type { 
   LoginRequest, 
   RegisterRequest, 
@@ -235,17 +236,22 @@ class AuthService {
    * ✅ SECURE: Always validates with backend
    */
   async validateToken(): Promise<User | null> {
-    const token = tokenService.getAccessToken();
+    console.log('AuthService: Validating token');
+    let token = tokenService.getAccessToken();
     
     if (!token) {
-      const refreshedToken = await tokenService.getValidToken();
-      if (!refreshedToken) {
+      console.log('AuthService: No access token, attempting refresh');
+      token = await tokenService.getValidToken();
+      if (!token) {
+        console.log('AuthService: No valid token available after refresh');
         return null;
       }
     }
 
     try {
+      console.log('AuthService: Getting current user');
       const user = await this.getCurrentUser();
+      console.log('AuthService: User validated successfully');
       return user;
     } catch (error) {
       console.warn('Token validation failed:', error);
@@ -266,6 +272,43 @@ class AuthService {
    */
   getToken(): string | null {
     return tokenService.getAccessToken();
+  }
+
+  /**
+   * Make authenticated request with automatic token refresh
+   * ✅ SECURE: Handles token refresh automatically
+   */
+  async authenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+    // Remove /api/ prefix if present since ApiClient handles it
+    const endpoint = url.startsWith('/api/') ? url.substring(5) : url;
+    
+    // Determine the HTTP method from options
+    const method = options.method || 'GET';
+    
+    let result;
+    
+    switch (method.toUpperCase()) {
+      case 'GET':
+        result = await apiClient.get<T>(endpoint);
+        break;
+      case 'POST':
+        result = await apiClient.post<T>(endpoint, options.body ? JSON.parse(options.body as string) : {});
+        break;
+      case 'PUT':
+        result = await apiClient.put<T>(endpoint, options.body ? JSON.parse(options.body as string) : {});
+        break;
+      case 'DELETE':
+        result = await apiClient.delete(endpoint);
+        break;
+      default:
+        throw new Error(`Unsupported HTTP method: ${method}`);
+    }
+    
+    if (!result.success) {
+      throw new Error(`Request failed: ${result.error?.status || 'Unknown error'}`);
+    }
+    
+    return result.data as T;
   }
 }
 

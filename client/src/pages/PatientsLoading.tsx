@@ -15,3 +15,4 @@ const PatientsLoading: React.FC = () => {
 
 export default PatientsLoading;
 
+

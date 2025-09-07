@@ -24,18 +24,18 @@ export interface TherapySession {
   lastModifiedBy?: string;
   // Additional fields from backend
   patientId?: string;
-  certificationStatus?: string;
+  certificationStatus?: number;
   fileNumber?: string;
   certificationLocation?: string;
 }
 
 export const ParentSignatureStatus = {
-  PENDING: 'pending',
-  SIGNED: 'signed',
-  COMPLETED: 'completed',
-  APPROVED: 'approved',
-  NOT_REQUIRED: 'not_required',
-  REFUSED: 'refused'
+  PENDING: 1,
+  SIGNED: 2,
+  COMPLETED: 2,
+  APPROVED: 3,
+  NOT_REQUIRED: 0,
+  REFUSED: 0
 } as const;
 
 export type ParentSignatureStatus = typeof ParentSignatureStatus[keyof typeof ParentSignatureStatus];

@@ -1,7 +1,7 @@
 // API Configuration
 export const API_CONFIG = {
   // Development
-  BASE_URL: 'https://localhost:7209/api',
+  BASE_URL: '/api', // Use proxy in development
   
   // Production (update this when deploying)
   // BASE_URL: 'https://your-production-api.com/api',

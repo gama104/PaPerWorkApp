@@ -1,10 +1,9 @@
-import { authService } from '../features/auth/services/authService';
+import { tokenService } from '../features/auth/services/tokenService';
 import type { 
-  ApiResponse, 
+  ApiResponse,
   ApiErrorResponse, 
   PagedApiResponse, 
-  ApiResult,
-  BaseApiResponse 
+  ApiResult
 } from '../shared/types/api';
 
 /**
@@ -13,7 +12,7 @@ import type {
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = 'https://localhost:7209/api') {
+  constructor(baseUrl: string = '/api') {
     this.baseUrl = baseUrl;
   }
 
@@ -23,9 +22,49 @@ export class ApiClient {
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<ApiResult<T>> {
     try {
       const url = this.buildUrl(endpoint, params);
-      const response = await authService.authenticatedRequest<ApiResponse<T>>(url);
+      const token = await tokenService.getValidToken();
       
-      return this.handleResponse(response);
+      if (!token) {
+        throw new Error('No valid token available');
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, try to refresh
+          const refreshedToken = await tokenService.getValidToken();
+          if (refreshedToken) {
+            // Retry with refreshed token
+            const retryResponse = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Request failed: ${retryResponse.status}`);
+            }
+
+            const retryData = await retryResponse.json();
+            return this.handleResponse(retryData);
+          }
+        }
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return this.handleResponse(data);
     } catch (error) {
       return this.handleError(error);
     }
@@ -37,49 +76,49 @@ export class ApiClient {
   async getPaginated<T>(endpoint: string, params?: Record<string, any>): Promise<ApiResult<T[]>> {
     try {
       const url = this.buildUrl(endpoint, params);
-      const response = await authService.authenticatedRequest<PagedApiResponse<T>>(url);
+      const token = await tokenService.getValidToken();
       
-      if (this.isPagedResponse(response)) {
-        return {
-          success: true,
-          data: response.data,
-          pagination: response.pagination
-        };
-      }
-      
-      // Handle legacy direct array responses
-      if (Array.isArray(response)) {
-        return {
-          success: true,
-          data: response as T[],
-          pagination: {
-            page: 1,
-            pageSize: response.length,
-            totalItems: response.length,
-            totalPages: 1,
-            hasNext: false,
-            hasPrevious: false
-          }
-        };
+      if (!token) {
+        throw new Error('No valid token available');
       }
 
-      // Handle wrapped array responses
-      if (this.isApiResponse(response) && Array.isArray(response.data)) {
-        return {
-          success: true,
-          data: response.data as T[],
-          pagination: {
-            page: 1,
-            pageSize: response.data.length,
-            totalItems: response.data.length,
-            totalPages: 1,
-            hasNext: false,
-            hasPrevious: false
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, try to refresh
+          const refreshedToken = await tokenService.getValidToken();
+          if (refreshedToken) {
+            // Retry with refreshed token
+            const retryResponse = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Request failed: ${retryResponse.status}`);
+            }
+
+            const retryData = await retryResponse.json();
+            return this.handlePaginatedResponse(retryData);
           }
-        };
+        }
+        throw new Error(`Request failed: ${response.status}`);
       }
 
-      throw new Error('Invalid paginated response structure');
+      const data = await response.json();
+      return this.handlePaginatedResponse(data);
     } catch (error) {
       return this.handleError(error);
     }
@@ -90,12 +129,52 @@ export class ApiClient {
    */
   async post<T>(endpoint: string, data: any): Promise<ApiResult<T>> {
     try {
-      const response = await authService.authenticatedRequest<ApiResponse<T>>(endpoint, {
+      const url = this.buildUrl(endpoint);
+      const token = await tokenService.getValidToken();
+      
+      if (!token) {
+        throw new Error('No valid token available');
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify(data)
       });
-      
-      return this.handleResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, try to refresh
+          const refreshedToken = await tokenService.getValidToken();
+          if (refreshedToken) {
+            // Retry with refreshed token
+            const retryResponse = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify(data)
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Request failed: ${retryResponse.status}`);
+            }
+
+            const retryData = await retryResponse.json();
+            return this.handleResponse(retryData);
+          }
+        }
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      return this.handleResponse(responseData);
     } catch (error) {
       return this.handleError(error);
     }
@@ -106,12 +185,52 @@ export class ApiClient {
    */
   async put<T>(endpoint: string, data: any): Promise<ApiResult<T>> {
     try {
-      const response = await authService.authenticatedRequest<ApiResponse<T>>(endpoint, {
+      const url = this.buildUrl(endpoint);
+      const token = await tokenService.getValidToken();
+      
+      if (!token) {
+        throw new Error('No valid token available');
+      }
+
+      const response = await fetch(url, {
         method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify(data)
       });
-      
-      return this.handleResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, try to refresh
+          const refreshedToken = await tokenService.getValidToken();
+          if (refreshedToken) {
+            // Retry with refreshed token
+            const retryResponse = await fetch(url, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify(data)
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Request failed: ${retryResponse.status}`);
+            }
+
+            const retryData = await retryResponse.json();
+            return this.handleResponse(retryData);
+          }
+        }
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      return this.handleResponse(responseData);
     } catch (error) {
       return this.handleError(error);
     }
@@ -122,11 +241,50 @@ export class ApiClient {
    */
   async delete(endpoint: string): Promise<ApiResult<void>> {
     try {
-      const response = await authService.authenticatedRequest<ApiResponse<void>>(endpoint, {
-        method: 'DELETE'
-      });
+      const url = this.buildUrl(endpoint);
+      const token = await tokenService.getValidToken();
       
-      return this.handleResponse(response);
+      if (!token) {
+        throw new Error('No valid token available');
+      }
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, try to refresh
+          const refreshedToken = await tokenService.getValidToken();
+          if (refreshedToken) {
+            // Retry with refreshed token
+            const retryResponse = await fetch(url, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${refreshedToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include'
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Request failed: ${retryResponse.status}`);
+            }
+
+            const retryData = await retryResponse.json();
+            return this.handleResponse(retryData);
+          }
+        }
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      return this.handleResponse(responseData);
     } catch (error) {
       return this.handleError(error);
     }
@@ -141,7 +299,7 @@ export class ApiClient {
       return {
         success: response.status >= 200 && response.status < 300,
         data: response.data,
-        error: response.status >= 400 ? response as ApiErrorResponse : undefined
+        error: response.status >= 400 ? response as unknown as ApiErrorResponse : undefined
       };
     }
 
@@ -150,6 +308,53 @@ export class ApiClient {
       success: true,
       data: response as T
     };
+  }
+
+  /**
+   * Handles paginated response data
+   */
+  private handlePaginatedResponse<T>(response: any): ApiResult<T[]> {
+    if (this.isPagedResponse(response)) {
+      return {
+        success: true,
+        data: response.data,
+        pagination: response.pagination
+      };
+    }
+    
+    // Handle legacy direct array responses
+    if (Array.isArray(response)) {
+      return {
+        success: true,
+        data: response as T[],
+        pagination: {
+          page: 1,
+          pageSize: response.length,
+          totalItems: response.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false
+        }
+      };
+    }
+
+    // Handle wrapped array responses
+    if (this.isApiResponse(response) && Array.isArray(response.data)) {
+      return {
+        success: true,
+        data: response.data as unknown as T[],
+        pagination: {
+          page: 1,
+          pageSize: response.data.length,
+          totalItems: response.data.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false
+        }
+      };
+    }
+
+    throw new Error('Invalid paginated response structure');
   }
 
   /**
@@ -204,11 +409,12 @@ export class ApiClient {
   /**
    * Type guard for API response
    */
-  private isApiResponse(response: any): response is BaseApiResponse {
+  private isApiResponse(response: any): response is ApiResponse<any> {
     return response && 
            typeof response === 'object' && 
            'status' in response && 
-           'message' in response;
+           'message' in response &&
+           'data' in response;
   }
 
   /**

@@ -92,3 +92,4 @@ export function CertificationsList({
 
 export default CertificationsList;
 
+

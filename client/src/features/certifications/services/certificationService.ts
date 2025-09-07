@@ -1,5 +1,6 @@
 // Certification Service - API Communication Layer
 import { tokenService } from '@/features/auth/services/tokenService';
+import { authService } from '@/features/auth/services/authService';
 import type {
   CertificationDocument,
   CreateCertificationRequest,
@@ -15,11 +16,11 @@ import type {
 // Lightweight certification response for session creation
 export interface CertificationForSessionsResponse {
   id: string;
-  month: string;
+  month: number;
   year: number;
   patientName: string;
-  status: string;
-  therapyType: string;
+  status: number;
+  therapyType: number;
   sessionCount: number;
 }
 
@@ -27,10 +28,10 @@ export interface CertificationForSessionsResponse {
 export interface CertificationListItemResponse {
   id: string;
   patientName: string;
-  month: string;
+  month: number;
   year: number;
-  therapyType: string;
-  status: string;
+  therapyType: number;
+  status: number;
   sessionCount: number;
   createdAt: string;
 }
@@ -57,7 +58,7 @@ class CertificationService {
       if (filter.therapistId) queryParams.append('therapistId', filter.therapistId);
       if (filter.month) queryParams.append('month', filter.month.toString());
       if (filter.year) queryParams.append('year', filter.year.toString());
-      if (filter.status) queryParams.append('status', filter.status);
+      if (filter.status) queryParams.append('status', filter.status.toString());
       if (filter.search) queryParams.append('search', filter.search);
       if (filter.startDate) queryParams.append('startDate', filter.startDate);
       if (filter.endDate) queryParams.append('endDate', filter.endDate);
@@ -68,34 +69,21 @@ class CertificationService {
 
       const url = queryParams.toString() ? `${this.baseURL}?${queryParams}` : this.baseURL;
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      const data = await authService.authenticatedRequest(url);
+      
+      console.log('CertificationService: Raw response data:', data);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          tokenService.logout();
-          throw new Error('Session expired');
-        }
-        throw new Error(data.message || 'Failed to fetch certifications');
-      }
-
-      if (data.status === 200 && data.data) {
+      // The authenticatedRequest returns the unwrapped data, so we need to check for the actual data structure
+      if (data && (data.items || data.certifications || Array.isArray(data))) {
+        const certifications = data.items || data.certifications || data;
         return {
-          certifications: data.data.items || data.data.certifications || data.data,
-          totalCount: data.data.totalCount || data.data.length,
-          page: data.data.page || 1,
-          pageSize: data.data.pageSize || data.data.length,
-          totalPages: data.data.totalPages || 1,
-          hasNext: data.data.hasNext || false,
-          hasPrevious: data.data.hasPrevious || false,
+          certifications: certifications,
+          totalCount: data.totalCount || data.pagination?.totalItems || certifications.length,
+          page: data.page || data.pagination?.page || 1,
+          pageSize: data.pageSize || data.pagination?.pageSize || certifications.length,
+          totalPages: data.totalPages || data.pagination?.totalPages || 1,
+          hasNext: data.hasNext || data.pagination?.hasNext || false,
+          hasPrevious: data.hasPrevious || data.pagination?.hasPrevious || false,
         };
       }
 
@@ -151,7 +139,7 @@ class CertificationService {
    */
   async getCertificationListItems(filter: {
     search?: string;
-    status?: string;
+    status?: number;
     month?: number;
     year?: number;
   } = {}): Promise<CertificationListItemResponse[]> {

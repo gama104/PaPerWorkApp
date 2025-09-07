@@ -17,7 +17,7 @@ interface TherapySessionFormData {
   location: string;
   durationMinutes: string;
   transportationRequired: boolean;
-  parentSignatureStatus: string;
+  parentSignatureStatus: number;
   certifyingOfficialName: string;
   notes: string;
   signatureData: string;
@@ -41,7 +41,7 @@ const TherapySessionForm: React.FC<TherapySessionFormProps> = ({
     sessionTime: "",
     location: "",
     transportationRequired: false,
-    parentSignatureStatus: "pending",
+    parentSignatureStatus: 1, // PENDING
     notes: "",
     signatureData: "",
     signatureName: "",
@@ -68,7 +68,7 @@ const TherapySessionForm: React.FC<TherapySessionFormProps> = ({
         sessionTime: editSession.sessionTime || "",
         location: editSession.location || "",
         transportationRequired: editSession.transportationRequired || false,
-        parentSignatureStatus: editSession.parentSignatureStatus || "pending",
+        parentSignatureStatus: editSession.parentSignatureStatus || 1, // PENDING
         notes: editSession.notes || "",
         signatureData: editSession.signatureImageData || "",
         signatureName: editSession.signatureName || "",
@@ -101,7 +101,7 @@ const TherapySessionForm: React.FC<TherapySessionFormProps> = ({
       signatureData: signatureData.signatureImageData,
       signatureName: signatureData.signedBy,
       signatureNotes: signatureData.signatureNotes || "",
-      parentSignatureStatus: "completed",
+      parentSignatureStatus: 2, // COMPLETED
     }));
     setShowSignatureModal(false);
   };
@@ -112,7 +112,7 @@ const TherapySessionForm: React.FC<TherapySessionFormProps> = ({
       signatureData: "",
       signatureName: "",
       signatureNotes: "",
-      parentSignatureStatus: "pending",
+      parentSignatureStatus: 1, // Use integer for PENDING status
     }));
   };
 
@@ -607,7 +607,7 @@ const TherapySessionForm: React.FC<TherapySessionFormProps> = ({
                     signatureData: signature,
                     signatureName: "Session Signature",
                     signatureNotes: "",
-                    parentSignatureStatus: "completed",
+                    parentSignatureStatus: 2, // COMPLETED
                   }));
                   setShowSignatureModal(false);
                 }}

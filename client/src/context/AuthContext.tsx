@@ -6,27 +6,19 @@ import React, {
   useCallback,
 } from "react";
 import type { ReactNode } from "react";
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  isActive: boolean;
-  isVerified: boolean;
-  emailConfirmed: boolean;
-  createdAt: string;
-  lastLoginAt?: string;
-}
+import { authService } from "../features/auth/services/authService";
+import type { User } from "../features/auth/types/auth.types";
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
+  isLoading: boolean;
+  error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,257 +38,128 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Token management utilities - direct localStorage access
-  const getStoredToken = useCallback(() => {
-    return localStorage.getItem("jwt_token");
-  }, []);
-
-  const getStoredUser = useCallback(() => {
-    const userData = localStorage.getItem("user_data");
-    return userData ? JSON.parse(userData) : null;
-  }, []);
-
-  const clearStoredAuth = useCallback(() => {
-    localStorage.removeItem("jwt_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user_data");
-  }, []);
-
-  const setStoredAuth = useCallback(
-    (token: string, userData: User, refreshToken?: string) => {
-      localStorage.setItem("jwt_token", token);
-      if (refreshToken) {
-        localStorage.setItem("refresh_token", refreshToken);
-      }
-      localStorage.setItem("user_data", JSON.stringify(userData));
-    },
-    []
-  );
-
-  // Validate stored authentication on app load
-  const validateStoredAuth = useCallback(async () => {
+  // Validate authentication using the new secure system
+  const validateAuth = useCallback(async () => {
     try {
-      const token = getStoredToken();
-      const storedUser = getStoredUser();
+      console.log("AuthContext: Validating authentication");
+      const validatedUser = await authService.validateToken();
 
-      if (!token || !storedUser) {
-        clearStoredAuth();
-        return false;
-      }
-
-      // Validate token with backend
-      try {
-        const { authService } = await import("../services/authService");
-        const response = await authService.getCurrentUser();
-
-        if (response.data) {
-          // Token is valid, update user data
-          const userData = response.data;
-          const user = {
-            id: userData.id,
-            email: userData.email,
-            firstName: userData.firstName || "",
-            lastName: userData.lastName || "",
-            role: userData.role,
-            isActive: userData.isActive || false,
-            isVerified: userData.isVerified || false,
-            emailConfirmed: userData.emailConfirmed || false,
-            createdAt: userData.createdAt || new Date().toISOString(),
-            lastLoginAt: userData.lastLoginAt,
-          };
-
-          // Update stored user data
-          setStoredAuth(token, user);
-          setUser(user);
-          return true;
-        }
-      } catch (error) {
-        console.log("🔍 Token validation failed with backend:", error);
-        // Token is invalid, clear auth
-        clearStoredAuth();
+      if (validatedUser) {
+        console.log("AuthContext: User validated successfully");
+        setUser(validatedUser);
+        return true;
+      } else {
+        console.log("AuthContext: No valid user found");
         setUser(null);
         return false;
       }
-
-      return false;
     } catch (error) {
-      console.error("🔍 Auth validation error:", error);
-      clearStoredAuth();
+      console.error("AuthContext: Authentication validation failed:", error);
       setUser(null);
       return false;
     }
-  }, [getStoredToken, getStoredUser, clearStoredAuth, setStoredAuth]);
+  }, []);
 
   // Initialize authentication state
   useEffect(() => {
     const initializeAuth = async () => {
       setLoading(true);
       try {
-        await validateStoredAuth();
+        await validateAuth();
       } catch (error) {
         console.error("Failed to initialize auth:", error);
-        clearStoredAuth();
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     initializeAuth();
-  }, [validateStoredAuth, clearStoredAuth]);
+  }, [validateAuth]);
 
-  // Session conflict detection and management
+  // Listen for logout events from token service
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      // Only handle changes from other tabs
-      if (e.key === "jwt_token" && e.newValue !== e.oldValue) {
-        // If we have a different token, logout this user
-        if (e.newValue && e.newValue !== getStoredToken()) {
-          clearStoredAuth();
-          setUser(null);
-
-          // Show user-friendly message
-          alert(
-            "Another user has logged in. You have been logged out for security reasons."
-          );
-
-          // Redirect to login
-          window.location.href = "/login";
-        }
-      }
+    const handleLogout = () => {
+      console.log("AuthContext: Logout event received from token service");
+      setUser(null);
     };
 
-    const handleBeforeUnload = () => {
-      // Set a flag to indicate this tab is closing
-      sessionStorage.setItem("tab_closing", "true");
-    };
-
-    // Listen for storage changes (other tabs)
-    window.addEventListener("storage", handleStorageChange);
-
-    // Listen for tab closing
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // Check if this tab was closed and reopened
-    const wasClosing = sessionStorage.getItem("tab_closing");
-    if (wasClosing) {
-      sessionStorage.removeItem("tab_closing");
-      // Refresh auth state to ensure consistency
-      validateStoredAuth();
-    }
+    window.addEventListener("auth:logout", handleLogout);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("auth:logout", handleLogout);
     };
-  }, [validateStoredAuth, clearStoredAuth, getStoredToken]);
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      setLoading(true);
-      clearStoredAuth();
+      setIsLoading(true);
+      setError(null);
+      console.log("AuthContext: Starting login process");
 
-      const { authService } = await import("../services/authService");
       const response = await authService.login({ email, password });
-      console.log("AuthContext: API response received:", response);
+      console.log("AuthContext: Login successful, user data:", response.user);
 
-      const userData = response.data.user;
-      const token = response.data.token;
-      const refreshToken = response.data.refreshToken;
+      // The authService already handles token storage via tokenService
+      // We just need to set the user in our context
+      setUser(response.user);
 
-      console.log("AuthContext: User data extracted:", userData);
-
-      const user = {
-        id: userData.id,
-        email: userData.email,
-        firstName: userData.firstName || "",
-        lastName: userData.lastName || "",
-        role: userData.role,
-        isActive: userData.isActive || false,
-        isVerified: userData.isVerified || false,
-        emailConfirmed: userData.emailConfirmed || false,
-        createdAt: userData.createdAt || new Date().toISOString(),
-        lastLoginAt: userData.lastLoginAt,
-      };
-
-      // Store authentication data
-      console.log("🔐 Storing auth data...");
-      setStoredAuth(token, user, refreshToken);
-
-      // Update state
-      console.log("🔐 Setting user state...");
-      setUser(user);
-
-      console.log("🔐 AuthContext: Login successful, user authenticated");
-      console.log("🔐 Current user state:", user);
-      console.log("🔐 Token exists:", !!token);
+      console.log("AuthContext: User authenticated successfully");
     } catch (error) {
-      console.error("Login failed:", error);
-      // Clear any partial auth data
-      clearStoredAuth();
+      console.error("AuthContext: Login failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Login failed";
+      setError(errorMessage);
       setUser(null);
       throw error;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      setLoading(true);
-      const { authService } = await import("../services/authService");
+      setIsLoading(true);
+      console.log("AuthContext: Starting logout process");
       await authService.logout();
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("AuthContext: Logout failed:", error);
     } finally {
-      // Always clear local state and storage
-      clearStoredAuth();
+      // Always clear local state
       setUser(null);
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const refreshUser = async () => {
     try {
-      const { authService } = await import("../services/authService");
-      const response = await authService.getCurrentUser();
-      const userData = response.data;
-
-      const user = {
-        id: userData.id,
-        email: userData.email,
-        firstName: userData.firstName || "",
-        lastName: userData.lastName || "",
-        role: userData.role,
-        isActive: userData.isActive || false,
-        isVerified: userData.isVerified || false,
-        emailConfirmed: userData.emailConfirmed || false,
-        createdAt: userData.createdAt || new Date().toISOString(),
-        lastLoginAt: userData.lastLoginAt,
-      };
-
-      // Update stored user data
-      const token = getStoredToken();
-      if (token) {
-        setStoredAuth(token, user);
-      }
-
-      setUser(user);
+      console.log("AuthContext: Refreshing user data");
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+      console.log("AuthContext: User data refreshed successfully");
     } catch (error) {
-      console.error("Failed to refresh user:", error);
-      // Clear invalid auth data
-      clearStoredAuth();
+      console.error("AuthContext: Failed to refresh user:", error);
       setUser(null);
     }
   };
 
+  const clearError = () => {
+    setError(null);
+  };
+
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user && !!localStorage.getItem("jwt_token"),
+    isAuthenticated: !!user && authService.isAuthenticated(),
     loading,
+    isLoading,
+    error,
     login,
     logout,
     refreshUser,
+    clearError,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

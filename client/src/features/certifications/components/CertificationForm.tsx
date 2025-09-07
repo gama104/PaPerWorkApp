@@ -17,57 +17,18 @@ interface CertificationFormProps extends BaseCertificationFormProps {
   error?: string | null;
 }
 
-const MONTHS = [
-  { value: "1", label: "January" },
-  { value: "2", label: "February" },
-  { value: "3", label: "March" },
-  { value: "4", label: "April" },
-  { value: "5", label: "May" },
-  { value: "6", label: "June" },
-  { value: "7", label: "July" },
-  { value: "8", label: "August" },
-  { value: "9", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
-];
+// Import industry-standard translation system
+import {
+  useMonthTranslation,
+  useTherapyTypeTranslation,
+  useCertificationStatusTranslation,
+} from "../../../shared/hooks/useTranslation";
 
-// Helper functions to convert between month names and numbers
-const monthNameToNumber = (monthName: string): string => {
-  const monthMap: { [key: string]: string } = {
-    January: "1",
-    February: "2",
-    March: "3",
-    April: "4",
-    May: "5",
-    June: "6",
-    July: "7",
-    August: "8",
-    September: "9",
-    October: "10",
-    November: "11",
-    December: "12",
-  };
-  return monthMap[monthName] || "";
-};
+// Helper functions removed - now using translation system
 
-const monthNumberToName = (monthNumber: string): string => {
-  const month = MONTHS.find((m) => m.value === monthNumber);
-  return month ? month.label : "";
-};
+// Remove hardcoded THERAPY_TYPES - now using translation hooks
 
-const THERAPY_TYPES = [
-  "Speech Language Therapy",
-  "Occupational Therapy",
-  "Physical Therapy",
-  "Behavioral Therapy",
-];
-
-const STATUS_OPTIONS = [
-  { value: "draft", label: "Draft" },
-  { value: "submitted", label: "Submitted" },
-  { value: "completed", label: "Completed" },
-];
+// Remove hardcoded STATUS_OPTIONS - will use translation hooks instead
 
 export const CertificationForm: React.FC<CertificationFormProps> = ({
   data: initialData,
@@ -79,6 +40,11 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
   therapistName = "",
   isPatientReadOnly = false,
 }) => {
+  // Use industry-standard translation hooks
+  const { getMonthOptions } = useMonthTranslation();
+  const { getTherapyTypeOptions } = useTherapyTypeTranslation();
+  const { getCertificationStatusOptions } = useCertificationStatusTranslation();
+
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   // Schedule rows for inline editing
@@ -100,17 +66,28 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
     initialData
       ? {
           ...initialData,
-          month: monthNameToNumber(initialData.month), // Convert month name to number
+          month:
+            typeof initialData.month === "string"
+              ? parseInt(initialData.month)
+              : initialData.month,
+          therapyType:
+            typeof initialData.therapyType === "string"
+              ? parseInt(initialData.therapyType)
+              : initialData.therapyType,
+          status:
+            typeof initialData.status === "string"
+              ? parseInt(initialData.status)
+              : initialData.status,
           specialistDate: initialData.specialistDate
             ? initialData.specialistDate.split("T")[0] // Convert datetime to date only
             : "",
         }
       : {
           patientId: "",
-          month: "",
+          month: 1,
           year: new Date().getFullYear(),
-          therapyType: "",
-          status: "draft",
+          therapyType: 1,
+          status: 1,
           fileNumber: "",
           isPrivate: false,
           hasPrivatePlan: false,
@@ -291,10 +268,12 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
     console.log("🔄 CertificationForm - Current schedule rows:", scheduleRows);
 
     const success = await submit(async (data) => {
-      // Include schedules in the form data and convert month number back to name
+      // Include schedules in the form data - send integers directly
       const formDataWithSchedules = {
         ...data,
-        month: monthNumberToName(data.month), // Convert month number back to name
+        month: data.month, // Send integer directly
+        therapyType: data.therapyType, // Send integer directly
+        status: data.status, // Send integer directly
         schedules:
           scheduleRows.length > 0
             ? scheduleRows.map((schedule) => ({
@@ -390,7 +369,7 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
           </label>
           <select
             value={formData.month}
-            onChange={(e) => updateField("month", e.target.value)}
+            onChange={(e) => updateField("month", parseInt(e.target.value))}
             className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 ${
               errors.month
                 ? "border-red-500"
@@ -398,7 +377,7 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
             }`}
           >
             <option value="">Select month</option>
-            {MONTHS.map((month) => (
+            {getMonthOptions().map((month) => (
               <option key={month.value} value={month.value}>
                 {month.label}
               </option>
@@ -446,7 +425,9 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
           </label>
           <select
             value={formData.therapyType}
-            onChange={(e) => updateField("therapyType", e.target.value)}
+            onChange={(e) =>
+              updateField("therapyType", parseInt(e.target.value))
+            }
             className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 ${
               errors.therapyType
                 ? "border-red-500"
@@ -454,9 +435,9 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
             }`}
           >
             <option value="">Select therapy type</option>
-            {THERAPY_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
+            {getTherapyTypeOptions().map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
@@ -499,19 +480,14 @@ export const CertificationForm: React.FC<CertificationFormProps> = ({
           </label>
           <select
             value={formData.status}
-            onChange={(e) =>
-              updateField(
-                "status",
-                e.target.value as "draft" | "submitted" | "completed"
-              )
-            }
+            onChange={(e) => updateField("status", parseInt(e.target.value))}
             className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 ${
               errors.status
                 ? "border-red-500"
                 : "border-gray-300 dark:border-gray-600"
             }`}
           >
-            {STATUS_OPTIONS.map((status) => (
+            {getCertificationStatusOptions().map((status) => (
               <option key={status.value} value={status.value}>
                 {status.label}
               </option>

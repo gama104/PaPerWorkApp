@@ -15,3 +15,4 @@ const CertificationsLoading: React.FC = () => {
 
 export default CertificationsLoading;
 
+

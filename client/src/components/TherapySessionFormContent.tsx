@@ -14,7 +14,7 @@ interface TherapySessionFormData {
   sessionTime: string;
   location: string;
   transportationRequired: boolean;
-  parentSignatureStatus: string;
+  parentSignatureStatus: number;
   notes: string;
   signatureImageData: string;
   signatureName: string;
@@ -35,7 +35,7 @@ const TherapySessionFormContent: React.FC<TherapySessionFormContentProps> = ({
     sessionTime: "",
     location: "",
     transportationRequired: false,
-    parentSignatureStatus: "pending",
+    parentSignatureStatus: 1, // PENDING
     notes: "",
     signatureImageData: "",
     signatureName: "",
@@ -58,7 +58,7 @@ const TherapySessionFormContent: React.FC<TherapySessionFormContentProps> = ({
         sessionTime: editSession.sessionTime || "",
         location: editSession.location || "",
         transportationRequired: editSession.transportationRequired || false,
-        parentSignatureStatus: editSession.parentSignatureStatus || "pending",
+        parentSignatureStatus: editSession.parentSignatureStatus || 1, // PENDING
         notes: editSession.notes || "",
         signatureImageData: editSession.signatureImageData || "",
         signatureName: editSession.signatureName || "",
@@ -86,7 +86,7 @@ const TherapySessionFormContent: React.FC<TherapySessionFormContentProps> = ({
       signatureImageData: "",
       signatureName: "",
       signatureNotes: "",
-      parentSignatureStatus: "pending",
+      parentSignatureStatus: 1, // Use integer for PENDING status
     }));
   };
 
@@ -403,7 +403,7 @@ const TherapySessionFormContent: React.FC<TherapySessionFormContentProps> = ({
                   signatureImageData: signature,
                   signatureName: "Session Signature",
                   signatureNotes: "",
-                  parentSignatureStatus: "completed",
+                  parentSignatureStatus: 2, // COMPLETED
                 }));
                 setShowSignatureModal(false);
               }}

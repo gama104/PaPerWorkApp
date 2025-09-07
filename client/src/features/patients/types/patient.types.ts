@@ -48,7 +48,7 @@ export interface TherapySession {
   sessionDate: string;
   sessionTime: string;
   location: string;
-  parentSignatureStatus: string;
+  parentSignatureStatus: number;
 }
 
 export interface PatientFormData {

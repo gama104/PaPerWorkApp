@@ -3,6 +3,13 @@ import type { CertificationDocument } from "../types/certification.types";
 import { format } from "date-fns";
 import { MobileOptimizedTable } from "../../../components/MobileOptimizedTable";
 import { useResponsive } from "../../../hooks/useResponsive";
+// Import industry-standard StatusBadge component
+import { StatusBadge } from "../../../shared/components/StatusBadge";
+import { CertificationStatus } from "../../../shared/constants/enums";
+import {
+  useMonthTranslation,
+  useTherapyTypeTranslation,
+} from "../../../shared/hooks/useTranslation";
 
 interface CertificationsListTableProps {
   certifications: CertificationDocument[];
@@ -30,6 +37,10 @@ export const CertificationsListTable: React.FC<
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 5 : 10;
 
+  // Use industry-standard translation hooks
+  const { getMonthName } = useMonthTranslation();
+  const { getTherapyTypeName } = useTherapyTypeTranslation();
+
   // Filter and sort certifications
   const filteredAndSortedCertifications = useMemo(() => {
     const filtered = certifications.filter((certification) => {
@@ -40,13 +51,15 @@ export const CertificationsListTable: React.FC<
             .toLowerCase()
             .includes(filter.search.toLowerCase())) ||
         (certification.therapyType &&
-          certification.therapyType
+          getTherapyTypeName(certification.therapyType)
             .toLowerCase()
             .includes(filter.search.toLowerCase()));
 
       const matchesStatus = (() => {
         if (filter.status === "all") return true;
-        return certification.status.toLowerCase() === filter.status;
+        // Convert integer status to string for comparison
+        const statusString = certification.status.toString();
+        return statusString === filter.status;
       })();
 
       const matchesMonth =
@@ -59,7 +72,7 @@ export const CertificationsListTable: React.FC<
     });
 
     return filtered;
-  }, [certifications, filter]);
+  }, [certifications, filter, getTherapyTypeName]);
 
   // Pagination
   const totalPages = Math.ceil(
@@ -77,89 +90,6 @@ export const CertificationsListTable: React.FC<
   ) => {
     setFilter((prev) => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filter changes
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: {
-        className:
-          "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-        label: "Draft",
-      },
-      submitted: {
-        className:
-          "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-        label: "Submitted",
-      },
-      approved: {
-        className:
-          "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-        label: "Approved",
-      },
-      rejected: {
-        className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-        label: "Rejected",
-      },
-      under_review: {
-        className:
-          "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-        label: "Under Review",
-      },
-      revision_required: {
-        className:
-          "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-        label: "Revision Required",
-      },
-    };
-
-    const config =
-      statusConfig[status.toLowerCase() as keyof typeof statusConfig] ||
-      statusConfig.draft;
-
-    return (
-      <span
-        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.className}`}
-      >
-        {config.label}
-      </span>
-    );
-  };
-
-  const getMonthName = (month: string | number) => {
-    // If it's already a full month name, return it
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-
-    const monthStr = month.toString().toLowerCase();
-
-    // Check if it's already a full month name
-    const fullMonthName = monthNames.find(
-      (name) => name.toLowerCase() === monthStr
-    );
-
-    if (fullMonthName) {
-      return fullMonthName;
-    }
-
-    // If it's a numeric string, convert it
-    const monthNumber = parseInt(monthStr);
-    if (!isNaN(monthNumber) && monthNumber >= 1 && monthNumber <= 12) {
-      return monthNames[monthNumber - 1];
-    }
-
-    return "Unknown";
   };
 
   return (
@@ -302,7 +232,13 @@ export const CertificationsListTable: React.FC<
             {
               key: "status",
               label: "Status",
-              render: (value: string) => getStatusBadge(value),
+              render: (value: string) => (
+                <StatusBadge
+                  status={parseInt(value) as CertificationStatus}
+                  type="certification"
+                  size="sm"
+                />
+              ),
             },
             {
               key: "createdAt",

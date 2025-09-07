@@ -39,7 +39,7 @@ export function LoginForm({ onSuccess, className = "" }: LoginFormProps) {
     }
 
     try {
-      await login(formData);
+      await login(formData.email, formData.password);
       onSuccess?.();
     } catch (error) {
       // Error is handled by the auth context
@@ -206,4 +206,3 @@ export function LoginForm({ onSuccess, className = "" }: LoginFormProps) {
 }
 
 export default LoginForm;
-

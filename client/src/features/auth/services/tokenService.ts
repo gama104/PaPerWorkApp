@@ -62,16 +62,19 @@ class TokenService {
     const currentToken = this.getAccessToken();
     
     if (currentToken && !this.shouldRefreshToken()) {
+      console.log('TokenService: Using existing valid token');
       return currentToken;
     }
 
     // Handle concurrent refresh requests
     if (this.refreshPromise) {
+      console.log('TokenService: Waiting for existing refresh request');
       await this.refreshPromise;
       return this.getAccessToken();
     }
 
     // Trigger token refresh
+    console.log('TokenService: Starting token refresh');
     this.refreshPromise = this.refreshAccessToken();
     const refreshSuccess = await this.refreshPromise;
     this.refreshPromise = null;
@@ -81,21 +84,24 @@ class TokenService {
 
   /**
    * Refresh access token using HTTP-only refresh cookie
-   * ✅ INDUSTRY STANDARD: Refresh token handled automatically by HTTP-only cookies
+   * Refresh token handled automatically by HTTP-only cookies
    */
   private async refreshAccessToken(): Promise<boolean> {
     try {
+      console.log('TokenService: Attempting token refresh');
       const response = await fetch('/api/Auth/refresh', {
         method: 'POST',
-        credentials: 'include', // ✅ SECURE: Send HTTP-only refresh cookie automatically
+        credentials: 'include', // Send HTTP-only refresh cookie automatically
         headers: {
           'Content-Type': 'application/json',
         },
-        // ✅ INDUSTRY STANDARD: No body needed - refresh token comes from HTTP-only cookie
       });
+
+      console.log('TokenService: Refresh response status:', response.status);
 
       if (!response.ok) {
         if (response.status === 401) {
+          console.log('TokenService: Refresh token expired or invalid');
           // Refresh token expired or invalid
           this.clearAccessToken();
           // Trigger logout
@@ -106,12 +112,15 @@ class TokenService {
       }
 
       const data = await response.json();
+      console.log('TokenService: Refresh response data:', data);
       
       if (data.status === 200 && data.data?.token) {
-        this.setAccessToken(data.data.token, 3600); // 1 hour default
+        this.setAccessToken(data.data.token, 900); // 15 minutes (consistent with login)
+        console.log('TokenService: Token refreshed successfully');
         return true;
       }
 
+      console.log('TokenService: Invalid refresh response format');
       return false;
     } catch (error) {
       console.error('Token refresh error:', error);

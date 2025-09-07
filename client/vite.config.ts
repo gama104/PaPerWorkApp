@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     force: true,
+    https: false, // Force HTTP
     proxy: {
       '/api': {
         target: 'https://localhost:7209',

@@ -20,12 +20,8 @@ import { PrivateRoute } from "../features/auth/components/PrivateRoute";
 import AccessDenied from "../pages/AccessDenied";
 import { ErrorBoundary } from "../shared/components/feedback";
 import { SecureSessionManager } from "./SecureSessionManager";
-import WelcomeModal from "./WelcomeModal";
-import { useWelcomeModal } from "../hooks/useWelcomeModal";
 
 const AppContent: React.FC = () => {
-  const { isOpen, closeModal, userName } = useWelcomeModal();
-
   return (
     <SecureSessionManager>
       <Router>
@@ -95,7 +91,6 @@ const AppContent: React.FC = () => {
           </div>
         </ErrorBoundary>
       </Router>
-      <WelcomeModal isOpen={isOpen} onClose={closeModal} userName={userName} />
     </SecureSessionManager>
   );
 };
